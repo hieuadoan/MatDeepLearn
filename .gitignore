@@ -1,1 +1,9 @@
 *.cif
+*.json
+*.pyc
+*.csv
+*.pyc
+*.pt
+*.pth
+.DS_Store
+*.txt
