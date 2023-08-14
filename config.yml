@@ -90,7 +90,8 @@ Processing:
     data_format: "json"
     #Print out processing info 
     verbose: "True"
-    #graph specific settings 
+    #graph specific settings
+    skin_to_skin : 2.5  # 0 means no skin to skin distance is considered  
     graph_max_radius : 8.0
     graph_max_neighbors : 12
     voronoi: "False"
@@ -112,8 +113,8 @@ Training:
     loss: "l1_loss"       
     #Ratios for train/val/test split out of a total of 1  
     train_ratio: 0.8
-    val_ratio: 0.05
-    test_ratio: 0.15
+    val_ratio: 0.1
+    test_ratio: 0.1
     #Training print out frequency (print per n number of epochs)
     verbosity: 5
     
