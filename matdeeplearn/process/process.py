@@ -282,6 +282,19 @@ def process_data(data_path, processed_path, processing_args):
 
         ##Obtain distance matrix with ase
         distance_matrix = ase_crystal.get_all_distances(mic=True)
+        
+        ##Include only neighbors based on skin to skin distances betwen atoms
+        if processing_args["skin_to_skin"]!=0:
+            cutOff = ase.neighborlist.natural_cutoffs(ase_crystal)
+            neighborList = ase.neighborlist.NeighborList(
+                                                        cutOff,
+                                                        skin=processing_args["skin_to_skin"], 
+                                                        self_interaction=False, 
+                                                        bothways=True
+                                                        )
+            neighborList.update(ase_crystal)
+            connectivity_matrix = neighborList.get_connectivity_matrix(sparse=False)
+            distance_matrix = connectivity_matrix * distance_matrix
 
         ##Create sparse graph from distance matrix
         distance_matrix_trimmed = threshold_sort(
@@ -438,9 +451,9 @@ def process_data(data_path, processed_path, processing_args):
             
         make_feature_SOAP = SOAP(
             species=species,
-            rcut=processing_args["SOAP_rcut"],
-            nmax=processing_args["SOAP_nmax"],
-            lmax=processing_args["SOAP_lmax"],
+            r_cut=processing_args["SOAP_rcut"],
+            n_max=processing_args["SOAP_nmax"],
+            l_max=processing_args["SOAP_lmax"],
             sigma=processing_args["SOAP_sigma"],
             periodic=periodicity,
             sparse=False,
