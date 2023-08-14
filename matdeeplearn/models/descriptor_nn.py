@@ -49,7 +49,7 @@ class SOAP(torch.nn.Module):
     def __init__(self, data, dim1, fc_count,  **kwargs):
         super(SOAP, self).__init__()
         
-        self.lin1 = torch.nn.Linear(data[0].extra_features_SOAP.shape[1], dim1)
+        self.lin1 = torch.nn.Linear(data[0].extra_features_SOAP.shape[0], dim1)
 
         self.lin_list = torch.nn.ModuleList(
             [torch.nn.Linear(dim1, dim1) for i in range(fc_count)]
@@ -59,7 +59,7 @@ class SOAP(torch.nn.Module):
 
     def forward(self, data):
 
-        out = F.relu(self.lin1(data.extra_features_SOAP))
+        out = F.relu(self.lin1(data.extra_features_SOAP.view(-1, data[0].extra_features_SOAP.shape[0])))
         for layer in self.lin_list:
             out = F.relu(layer(out))
         out = self.lin2(out)
