@@ -78,7 +78,7 @@ class GCN(torch.nn.Module):
         self.bn_list = torch.nn.ModuleList()
         for i in range(gc_count):
             conv = GCNConv(
-                gc_dim, gc_dim, improved=True, add_self_loops=False
+                gc_dim, gc_dim, improved=True, add_self_loops=True, normalize=True
             )
             self.conv_list.append(conv)
             ##Track running stats set to false can prevent some instabilities; this causes other issues with different val/test performance from loader size?
