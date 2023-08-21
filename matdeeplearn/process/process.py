@@ -284,7 +284,8 @@ def process_data(data_path, processed_path, processing_args):
         distance_matrix = ase_crystal.get_all_distances(mic=True)
         
         ##Include only neighbors based on skin to skin distances betwen atoms
-        if processing_args["skin_to_skin"]!=0:
+        if processing_args["skin_to_skin"] != "None":
+            assert isinstance(processing_args["skin_to_skin"], float), "skin_to_skin must be a float"
             cutOff = ase.neighborlist.natural_cutoffs(ase_crystal)
             neighborList = ase.neighborlist.NeighborList(
                                                         cutOff,
@@ -294,23 +295,40 @@ def process_data(data_path, processed_path, processing_args):
                                                         )
             neighborList.update(ase_crystal)
             connectivity_matrix = neighborList.get_connectivity_matrix(sparse=False)
+            connectivity_matrix[connectivity_matrix==0] = 99
             distance_matrix = connectivity_matrix * distance_matrix
 
+        ## Assuming that the adsorbate atoms are the last atoms in the structure
+        if processing_args["num_adsorbate_atoms"]!=0:
+            ads_idx_list = [i for i in range(len(ase_crystal)-processing_args["num_adsorbate_atoms"], len(ase_crystal))]  
+        else:
+            ads_idx_list = []
+            
         ##Create sparse graph from distance matrix
-        distance_matrix_trimmed = threshold_sort(
+        
+        distance_matrix_trimmed = threshold_sort_v2(
             distance_matrix,
             processing_args["graph_max_radius"],
             processing_args["graph_max_neighbors"],
+            processing_args["adsorbate_max_radius"],
+            adsorbate_indices=ads_idx_list,
             adj=False,
         )
+        
+        #distance_matrix_trimmed = threshold_sort(
+        #    distance_matrix,
+        #    processing_args["graph_max_radius"],
+        #    processing_args["graph_max_neighbors"],
+        #    adj=False,
+        #)
 
         distance_matrix_trimmed = torch.Tensor(distance_matrix_trimmed)
         out = dense_to_sparse(distance_matrix_trimmed)
         edge_index = out[0]
         edge_weight = out[1]
 
-        self_loops = True
-        if self_loops == True:
+        ##Add self loops
+        if processing_args["self_loops"] == "True":    
             edge_index, edge_weight = add_self_loops(
                 edge_index, edge_weight, num_nodes=len(ase_crystal), fill_value=0
             )
@@ -320,7 +338,7 @@ def process_data(data_path, processed_path, processing_args):
             distance_matrix_mask = (
                 distance_matrix_trimmed.fill_diagonal_(1) != 0
             ).int()
-        elif self_loops == False:
+        elif processing_args["self_loops"] == "False":
             data.edge_index = edge_index
             data.edge_weight = edge_weight
 
@@ -588,6 +606,57 @@ def threshold_sort(matrix, threshold, neighbors, reverse=False, adj=False):
         )
         return distance_matrix_trimmed, adj_list, adj_attr
 
+def threshold_sort_v2(matrix, threshold, neighbors, ads_threshold=None, adsorbate_indices=[], reverse=False, adj=False):
+     
+    if ads_threshold is not None and len(adsorbate_indices) > 0:
+        # Create mask for all rows excluding the ads row (adsIdxList)
+        mask = np.ones_like(matrix, dtype=bool)
+        for i in range(matrix.shape[0]):
+            if i not in adsorbate_indices:
+                mask[i] = matrix[i] > threshold
+        # Create mask for the ads_rows with ads_threshold
+        for i in adsorbate_indices:
+            mask[i] = matrix[i] > ads_threshold
+        # Apply mask
+        distance_matrix_trimmed = np.ma.array(matrix, mask=mask)
+    else:    
+        mask = matrix > threshold
+        distance_matrix_trimmed = np.ma.array(matrix, mask=mask)
+        
+    if reverse == False:
+        distance_matrix_trimmed = rankdata(
+            distance_matrix_trimmed, method="ordinal", axis=1
+        )
+    elif reverse == True:
+        distance_matrix_trimmed = rankdata(
+            distance_matrix_trimmed * -1, method="ordinal", axis=1
+        )
+    distance_matrix_trimmed = np.nan_to_num(
+        np.where(mask, np.nan, distance_matrix_trimmed)
+    )
+    distance_matrix_trimmed[distance_matrix_trimmed > neighbors + 1] = 0
+
+    if adj == False:
+        distance_matrix_trimmed = np.where(
+            distance_matrix_trimmed == 0, distance_matrix_trimmed, matrix
+        )
+        return distance_matrix_trimmed
+    elif adj == True:
+        adj_list = np.zeros((matrix.shape[0], neighbors + 1))
+        adj_attr = np.zeros((matrix.shape[0], neighbors + 1))
+        for i in range(0, matrix.shape[0]):
+            temp = np.where(distance_matrix_trimmed[i] != 0)[0]
+            adj_list[i, :] = np.pad(
+                temp,
+                pad_width=(0, neighbors + 1 - len(temp)),
+                mode="constant",
+                constant_values=0,
+            )
+            adj_attr[i, :] = matrix[i, adj_list[i, :].astype(int)]
+        distance_matrix_trimmed = np.where(
+            distance_matrix_trimmed == 0, distance_matrix_trimmed, matrix
+        )
+        return distance_matrix_trimmed, adj_list, adj_attr
 
 ##Slightly edited version from pytorch geometric to create edge from gaussian basis
 class GaussianSmearing(torch.nn.Module):
