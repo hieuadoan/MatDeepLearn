@@ -88,15 +88,10 @@ Processing:
     dictionary_path: "atom_dict.json"     
     #Format of data files (limit to those supported by ASE)
     data_format: "json"
-    #Add self loops to graphs
-    self_loops: "False"
     #Print out processing info 
     verbose: "True"
     #graph specific settings
-    skin_to_skin : 2.5  #None means no skin to skin distance is considered  
     graph_max_radius : 8.0
-    num_adsorbate_atoms: 1 #0 for no adsorbate, otherwise int
-    adsorbate_max_radius: 8.0 #None for no adsorbate, otherwise float. Need to set num_adsorbate_atoms > 0 for this to work
     graph_max_neighbors : 12
     voronoi: "False"
     edge_features: "True"
